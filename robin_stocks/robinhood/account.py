@@ -153,6 +153,120 @@ def get_open_stock_positions(account_number=None, info=None):
 
 
 @login_required
+def get_tax_lots(symbol, account_number=None, info=None):
+    """Returns a list of open tax lots for a given stock symbol. Each lot
+    represents a separate purchase still held in the position.
+
+    :param symbol: The stock ticker.
+    :type symbol: str
+    :param account_number: the robinhood account number.
+    :type account_number: Optional[str]
+    :param info: Will filter the results to get a specific value.
+    :type info: Optional[str]
+    :returns: [list] Returns a list of dictionaries of key/value pairs for each tax lot. If info parameter is provided, \
+    a list of strings is returned where the strings are the value of the key that matches info.
+    :Dictionary Keys: * account_number
+                      * instrument_id
+                      * open_lot_id
+                      * open_tran_type
+                      * order_id
+                      * quantity
+                      * quantity_available
+                      * book_cost_basis
+                      * tax_cost_basis
+                      * book_proceeds
+                      * open_date
+                      * term
+                      * is_selectable
+                      * cost_per_share
+
+    """
+    try:
+        symbol = symbol.upper().strip()
+    except AttributeError as message:
+        print(message, file=get_output())
+        return [None]
+    instrument_ids = get_instruments_by_symbols(symbol, info='id')
+    if not instrument_ids:
+        return [None]
+    if account_number is None:
+        account_number = load_account_profile(info='account_number')
+    url = tax_lots_open_url(account_number, instrument_ids[0])
+    payload = {
+        'sort_type': 'date',
+        'sort_direction': 'DESC',
+        'fetch_max_abs_values': 'true',
+    }
+    price_list = get_latest_price(symbol)
+    if price_list and price_list[0] is not None:
+        payload['price'] = round_price(float(price_list[0]))
+    data = request_get(url, 'pagination', payload)
+    return(filter_data(data, info))
+
+
+@login_required
+def get_selected_tax_lots(order_id, account_number=None, info=None):
+    """Returns the open tax lots that were selected when placing a sell-by-lot order.
+
+    :param order_id: The id of the sell order whose selected lots to retrieve.
+    :type order_id: str
+    :param account_number: the robinhood account number.
+    :type account_number: Optional[str]
+    :param info: Will filter the results to get a specific value.
+    :type info: Optional[str]
+    :returns: [list] Returns a list of dictionaries of key/value pairs for each selected lot. If info parameter is provided, \
+    a list of strings is returned where the strings are the value of the key that matches info.
+    :Dictionary Keys: * id
+                      * original_quantity
+                      * active_quantity
+                      * account_number
+                      * instrument_id
+                      * order_id
+                      * open_lot_id
+                      * tax_cost_basis_per_share
+                      * term
+                      * tax_lot_open_date
+
+    """
+    if account_number is None:
+        account_number = load_account_profile(info='account_number')
+    url = tax_lots_selected_url(order_id)
+    payload = {
+        'account_number': account_number,
+        'fetch_max_abs_values': 'true',
+    }
+    data = request_get(url, 'pagination', payload)
+    return(filter_data(data, info))
+
+
+@login_required
+def get_closed_tax_lots(order_id, account_number=None, info=None):
+    """Returns the closed (settled) tax lots for a given sell order, with the
+    realized cost basis and term per lot.
+
+    :param order_id: The id of the sell order whose closed lots to retrieve.
+    :type order_id: str
+    :param account_number: the robinhood account number.
+    :type account_number: Optional[str]
+    :param info: Will filter the results to get a specific value.
+    :type info: Optional[str]
+    :returns: [list] Returns a list of dictionaries of key/value pairs for each closed lot. If info parameter is provided, \
+    a list of strings is returned where the strings are the value of the key that matches info. \
+    Returns an empty list until the order has settled.
+
+    """
+    if account_number is None:
+        account_number = load_account_profile(info='account_number')
+    url = tax_lots_closed_url(order_id)
+    payload = {
+        'account_number': account_number,
+        'fetch_max_abs_values': 'true',
+    }
+    data = request_get(url, 'pagination', payload)
+    return(filter_data(data, info))
+
+
+@login_required
 def get_dividends(info=None):
     """Returns a list of dividend trasactions that include information such as the percentage rate,
     amount, shares of held stock, and date paid.
