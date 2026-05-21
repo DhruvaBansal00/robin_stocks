@@ -875,3 +875,61 @@ class TestAccountInformation:
             assert ('direction' in interest)
             assert ('payout_type' in interest)
             assert ('reason' in interest)
+
+
+class TestTaxLots:
+    fake_symbol = 'thisisfake'
+    fake_order_id = '00000000-0000-0000-0000-000000000000'
+
+    @classmethod
+    def setup_class(cls):
+        totp = pyotp.TOTP(os.environ['robin_mfa']).now()
+        login = r.login(os.environ['robin_username'], os.environ['robin_password'], mfa_code=totp)
+
+    @classmethod
+    def teardown_class(cls):
+        r.logout()
+
+    def test_get_tax_lots_for_held_position(self):
+        positions = r.get_open_stock_positions()
+        if not positions:
+            pytest.skip('Test account has no open stock positions')
+        symbol = None
+        for p in positions:
+            if float(p.get('quantity', '0')) > 0:
+                symbol = r.get_instrument_by_url(p['instrument'], info='symbol')
+                if symbol:
+                    break
+        if not symbol:
+            pytest.skip('No held position resolvable to a symbol')
+        lots = r.get_tax_lots(symbol)
+        assert isinstance(lots, list)
+        if not lots or lots == [None]:
+            pytest.skip('Held position has no tax lots returned (e.g. legacy holding)')
+        lot = lots[0]
+        assert ('account_number' in lot)
+        assert ('instrument_id' in lot)
+        assert ('open_lot_id' in lot)
+        assert ('open_tran_type' in lot)
+        assert ('order_id' in lot)
+        assert ('quantity' in lot)
+        assert ('quantity_available' in lot)
+        assert ('book_cost_basis' in lot)
+        assert ('tax_cost_basis' in lot)
+        assert ('book_proceeds' in lot)
+        assert ('open_date' in lot)
+        assert ('term' in lot)
+        assert ('is_selectable' in lot)
+        assert ('cost_per_share' in lot)
+
+    def test_get_tax_lots_unknown_symbol(self):
+        result = r.get_tax_lots(self.fake_symbol)
+        assert result == [None]
+
+    def test_get_selected_tax_lots_returns_list(self):
+        result = r.get_selected_tax_lots(self.fake_order_id)
+        assert isinstance(result, list)
+
+    def test_get_closed_tax_lots_returns_list(self):
+        result = r.get_closed_tax_lots(self.fake_order_id)
+        assert isinstance(result, list)

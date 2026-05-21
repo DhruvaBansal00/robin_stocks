@@ -526,6 +526,88 @@ def order_sell_market(symbol, quantity, account_number=None, timeInForce='gtc', 
 
 
 @login_required
+def order_sell_tax_lot(symbol, lots, account_number=None, timeInForce='gfd', extendedHours=False, jsonify=True, market_hours='regular_hours'):
+    """Submits a market sell order that closes specific open tax lots, as
+    exposed by the "Sell by Lot" flow in the Robinhood UI. The total quantity
+    sold equals the sum of the quantities across the provided lots.
+
+    :param symbol: The stock ticker.
+    :type symbol: str
+    :param lots: A list of dictionaries, each with keys 'open_lot_id' and 'quantity', \
+    one entry per lot to close. Lot ids come from get_tax_lots(symbol).
+    :type lots: list
+    :param account_number: the robinhood account number.
+    :type account_number: Optional[str]
+    :param timeInForce: Changes how long the order will be in effect for. 'gtc' = good until cancelled. \
+    'gfd' = good for the day.
+    :type timeInForce: Optional[str]
+    :param extendedHours: Premium users only. Allows trading during extended hours. Should be true or false.
+    :type extendedHours: Optional[bool]
+    :param jsonify: If set to False, function will return the request object which contains status code and headers.
+    :type jsonify: Optional[bool]
+    :param market_hours: One of 'regular_hours', 'extended_hours', 'all_day_hours'.
+    :type market_hours: Optional[str]
+    :returns: Dictionary that contains information regarding the sell order, \
+    such as the order id, the state of the order, and the quantity.
+
+    """
+    try:
+        symbol = symbol.upper().strip()
+    except AttributeError as message:
+        print(message, file=get_output())
+        return None
+
+    if not lots:
+        print("ERROR: lots list cannot be empty.", file=get_output())
+        return None
+
+    from decimal import Decimal
+    normalized_lots = []
+    total_quantity = Decimal('0')
+    for lot in lots:
+        if 'open_lot_id' not in lot or 'quantity' not in lot:
+            print("ERROR: each lot must contain 'open_lot_id' and 'quantity'.", file=get_output())
+            return None
+        try:
+            qty_str = str(lot['quantity'])
+            total_quantity += Decimal(qty_str)
+        except Exception as message:
+            print("ERROR: invalid lot quantity: {0}".format(message), file=get_output())
+            return None
+        normalized_lots.append({
+            'open_lot_id': lot['open_lot_id'],
+            'quantity': qty_str,
+        })
+
+    from datetime import datetime, timezone
+    payload = {
+        'account': load_account_profile(account_number=account_number, info='url'),
+        'instrument': get_instruments_by_symbols(symbol, info='url')[0],
+        'symbol': symbol,
+        'ask_price': round_price(next(iter(get_latest_price(symbol, "ask_price", extendedHours)), 0.00)),
+        'bid_ask_timestamp': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'bid_price': round_price(next(iter(get_latest_price(symbol, "bid_price", extendedHours)), 0.00)),
+        'estimated_fees': [],
+        'estimated_total_fee': '0.00',
+        'quantity': str(total_quantity),
+        'tax_lot_selection_type': 'custom',
+        'tax_lots': normalized_lots,
+        'market_hours': market_hours,
+        'order_form_version': 7,
+        'position_effect': 'close',
+        'ref_id': str(uuid4()),
+        'side': 'sell',
+        'time_in_force': timeInForce,
+        'trigger': 'immediate',
+        'type': 'market',
+        'extended_hours': extendedHours,
+    }
+    url = orders_url(account_number=account_number)
+    data = request_post(url, payload, json=True, jsonify_data=jsonify)
+    return(data)
+
+
+@login_required
 def order_sell_fractional_by_quantity(symbol, quantity, account_number=None, timeInForce='gfd', priceType='bid_price', extendedHours=False, jsonify=True, market_hours='regular_hours'):
     """Submits a market order to be executed immediately for fractional shares by specifying the amount that you want to trade.
     Good for share fractions up to 6 decimal places. Robinhood does not currently support placing limit, stop, or stop loss orders

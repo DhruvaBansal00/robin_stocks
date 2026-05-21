@@ -98,6 +98,18 @@ def positions_url(account_number=None):
     else:
         return('https://api.robinhood.com/positions/')
 
+
+def tax_lots_open_url(account_number, instrument_id):
+    return('https://api.robinhood.com/tax_lots/open/{0}/{1}/'.format(account_number, instrument_id))
+
+
+def tax_lots_selected_url(order_id):
+    return('https://api.robinhood.com/tax_lots/order/{0}/selected/'.format(order_id))
+
+
+def tax_lots_closed_url(order_id):
+    return('https://api.robinhood.com/tax_lots/order/{0}/closed/'.format(order_id))
+
 def banktransfers_url(direction=None):
     if direction == 'received':
         return('https://api.robinhood.com/ach/received/transfers/')
