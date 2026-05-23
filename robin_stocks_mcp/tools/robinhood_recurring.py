@@ -2,6 +2,8 @@
 
 These wrap the SDK's recurring-investment helpers, which hit the
 undocumented bonfire.robinhood.com/recurring_schedules/ endpoint.
+The opt-in rate-limiter toggles (paired with the same upstream PR)
+are also exposed here.
 """
 
 from __future__ import annotations
@@ -12,6 +14,30 @@ import robin_stocks.robinhood as rh
 
 from ..app import mcp
 from ..runtime import safe_tool, to_thread
+
+
+# ---------------------------------------------------------------------------
+# Rate-limiter toggles (local SDK state, not server-side writes)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@safe_tool()
+async def rh_enable_rate_limiting(delay: float = 1.0) -> str:
+    """Enable in-process rate limiting for all Robinhood SDK requests.
+
+    `delay` is the minimum seconds between requests. Off by default.
+    """
+    await to_thread(rh.enable_rate_limiting, delay=delay)
+    return f"ok: rate limiting enabled (delay={delay}s)"
+
+
+@mcp.tool()
+@safe_tool()
+async def rh_disable_rate_limiting() -> str:
+    """Disable in-process rate limiting for Robinhood SDK requests."""
+    await to_thread(rh.disable_rate_limiting)
+    return "ok: rate limiting disabled"
 
 
 @mcp.tool()

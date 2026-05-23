@@ -100,3 +100,24 @@ async def test_rh_cancel_recurring_investment_dispatches_when_writes_enabled(wri
     with patch("robin_stocks.robinhood.cancel_recurring_investment", return_value={"state": "deleted"}) as m:
         await get_fn("rh_cancel_recurring_investment")(schedule_id="s1")
         m.assert_called_once_with("s1", jsonify=True)
+
+
+# ---------------------------------------------------------------------------
+# Rate-limiter toggles
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_rh_enable_rate_limiting_dispatches() -> None:
+    with patch("robin_stocks.robinhood.enable_rate_limiting") as m:
+        out = await get_fn("rh_enable_rate_limiting")(delay=2.5)
+        m.assert_called_once_with(delay=2.5)
+        assert "rate limiting enabled" in out
+
+
+@pytest.mark.asyncio
+async def test_rh_disable_rate_limiting_dispatches() -> None:
+    with patch("robin_stocks.robinhood.disable_rate_limiting") as m:
+        out = await get_fn("rh_disable_rate_limiting")()
+        m.assert_called_once_with()
+        assert "disabled" in out
